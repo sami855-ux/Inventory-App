@@ -3,6 +3,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  View,
   ViewStyle,
 } from "react-native"
 
@@ -13,6 +14,10 @@ interface ButtonProps {
   disabled?: boolean
   variant?: "primary" | "secondary" | "danger"
   style?: ViewStyle
+
+  // ✨ NEW
+  icon?: React.ReactNode
+  iconPosition?: "left" | "right"
 }
 
 export default function Button({
@@ -22,6 +27,8 @@ export default function Button({
   disabled = false,
   variant = "primary",
   style,
+  icon,
+  iconPosition = "left",
 }: ButtonProps) {
   const backgroundColor = {
     primary: "#2563EB",
@@ -29,22 +36,36 @@ export default function Button({
     danger: "#DC2626",
   }[variant]
 
+  const isDisabled = disabled || loading
+
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled || loading}
+      disabled={isDisabled}
       style={({ pressed }) => [
         styles.button,
         { backgroundColor },
         pressed && styles.pressed,
-        (disabled || loading) && styles.disabled,
+        isDisabled && styles.disabled,
         style,
       ]}
     >
       {loading ? (
         <ActivityIndicator color="#fff" />
       ) : (
-        <Text style={styles.text}>{title}</Text>
+        <View style={styles.content}>
+          {/* LEFT ICON */}
+          {icon && iconPosition === "left" && (
+            <View style={styles.icon}>{icon}</View>
+          )}
+
+          <Text style={styles.text}>{title}</Text>
+
+          {/* RIGHT ICON */}
+          {icon && iconPosition === "right" && (
+            <View style={styles.icon}>{icon}</View>
+          )}
+        </View>
       )}
     </Pressable>
   )
@@ -53,19 +74,33 @@ export default function Button({
 const styles = StyleSheet.create({
   button: {
     paddingVertical: 14,
+    paddingHorizontal: 14,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
   },
+
+  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  icon: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   text: {
     color: "#fff",
-    // fontWeight: "600",
     fontSize: 15,
     fontFamily: "Inter-Regular",
   },
+
   disabled: {
     opacity: 0.6,
   },
+
   pressed: {
     opacity: 0.8,
   },

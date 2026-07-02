@@ -1,3 +1,4 @@
+import { fonts } from "@/src/lib/theme"
 import { StyleSheet, Text, TextInput, TextInputProps, View } from "react-native"
 
 interface InputProps extends TextInputProps {
@@ -28,8 +29,8 @@ const styles = StyleSheet.create({
 
   label: {
     marginBottom: 8,
-    fontWeight: "600",
     color: "#111827",
+    fontFamily: fonts.medium,
   },
 
   input: {
@@ -38,7 +39,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
+    fontFamily: fonts.medium,
     backgroundColor: "#fff",
   },
 

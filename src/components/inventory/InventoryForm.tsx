@@ -2,25 +2,21 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { ScrollView, StyleSheet, Text, View } from "react-native"
 
-import { ImagePickerField } from "@/src/components/inventory/ImagePickerField"
 import Button from "@/src/components/ui/Button"
 import Input from "@/src/components/ui/Input"
 import { colors, fonts, radius, spacing } from "@/src/lib/theme"
 
-import type { InventoryItemInput, LocalImage } from "@/src/types/inventory"
+import type { InventoryItemInput } from "@/src/types/inventory"
 import {
   inventorySchema,
   type InventoryFormSchema,
 } from "@/src/types/inventory.schema"
-import { pickImage } from "@/src/utils/pickImage"
-import { useState } from "react"
 
 interface InventoryFormProps {
   initialValues?: InventoryFormSchema
-  initialImageUrl?: string | null
   submitLabel: string
   submitting: boolean
-  onSubmit: (input: InventoryItemInput, newImage: LocalImage | null) => void
+  onSubmit: (input: InventoryItemInput) => void
 }
 
 const emptyValues: InventoryFormSchema = {
@@ -32,7 +28,6 @@ const emptyValues: InventoryFormSchema = {
 
 export function InventoryForm({
   initialValues = emptyValues,
-  initialImageUrl,
   submitLabel,
   submitting,
   onSubmit,
@@ -40,46 +35,19 @@ export function InventoryForm({
   const {
     control,
     handleSubmit,
-    setError,
-    clearErrors,
     formState: { errors },
   } = useForm<InventoryFormSchema>({
     resolver: zodResolver(inventorySchema),
     defaultValues: initialValues,
   })
 
-  const [localImage, setLocalImage] = useState<LocalImage | null>(null)
-
-  const previewUri = localImage?.uri ?? initialImageUrl ?? null
-
-  async function handlePickImage() {
-    try {
-      const image = await pickImage()
-      if (image) {
-        setLocalImage(image)
-        clearErrors("name") // optional cleanup hook-style
-      }
-    } catch (err) {
-      setError("name", {
-        message: err instanceof Error ? err.message : "Image error",
-      })
-    }
-  }
-
-  const submitHandler = (data: InventoryFormSchema) => {
-    if (!previewUri) {
-      return
-    }
-
-    onSubmit(
-      {
-        name: data.name.trim(),
-        description: data.description.trim(),
-        quantity: Number(data.quantity),
-        price: Number(data.price),
-      },
-      localImage,
-    )
+  function submitHandler(data: InventoryFormSchema) {
+    onSubmit({
+      name: data.name.trim(),
+      description: data.description.trim(),
+      quantity: Number(data.quantity),
+      price: Number(data.price),
+    })
   }
 
   return (
@@ -88,13 +56,6 @@ export function InventoryForm({
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* IMAGE */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Photo</Text>
-        <ImagePickerField uri={previewUri} onPick={handlePickImage} />
-      </View>
-
-      {/* FORM */}
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Details</Text>
 
@@ -168,7 +129,6 @@ export function InventoryForm({
         </View>
       </View>
 
-      {/* SUBMIT */}
       <View style={styles.submitWrapper}>
         <Button
           title={submitLabel}
@@ -181,8 +141,13 @@ export function InventoryForm({
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl + spacing.lg },
-  section: { marginBottom: spacing.xl },
+  content: {
+    padding: spacing.lg,
+    // paddingBottom: spacing.xxl + spacing.lg,
+  },
+  section: {
+    marginBottom: spacing.xl,
+  },
   sectionLabel: {
     fontSize: 13,
     fontFamily: fonts.medium,
@@ -198,8 +163,19 @@ const styles = StyleSheet.create({
     borderColor: colors.borderLight,
     padding: spacing.lg,
   },
-  textArea: { minHeight: 80, textAlignVertical: "top", paddingTop: spacing.md },
-  row: { flexDirection: "row", gap: spacing.md },
-  rowItem: { flex: 1 },
-  submitWrapper: { marginTop: spacing.sm },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: "top",
+    paddingTop: spacing.md,
+  },
+  row: {
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  rowItem: {
+    flex: 1,
+  },
+  submitWrapper: {
+    marginTop: spacing.sm,
+  },
 })

@@ -42,8 +42,12 @@ export default function RootLayout() {
           options={{ title: "Inventory", headerShown: false }}
         />
         <Stack.Screen
-          name="item/create"
-          options={{ title: "Add Item", presentation: "modal" }}
+          name="item/create/index"
+          options={{
+            title: "Add Item",
+            presentation: "modal",
+            headerShown: false,
+          }}
         />
         <Stack.Screen
           name="item/[id]"

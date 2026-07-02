@@ -9,13 +9,23 @@ import { PAGE_SIZE, TABLE_NAME } from "./constants"
 import { deleteImage, uploadImage } from "./storage"
 import { supabase } from "./supabaseClient"
 
-export async function getItems(page: number = 0): Promise<InventoryItem[]> {
+//  GET ITEMS (exclude deleted)
+export async function getItems(page: number = 0) {
   const from = page * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select("*")
+    .select(
+      `
+      *,
+      categories:category_id (
+        id,
+        name
+      )
+    `,
+    )
+    .eq("is_deleted", false)
     .order("created_at", { ascending: false })
     .range(from, to)
 
@@ -24,11 +34,21 @@ export async function getItems(page: number = 0): Promise<InventoryItem[]> {
   return data ?? []
 }
 
+//  GET SINGLE ITEM (prevent deleted access)
 export async function getItem(id: string): Promise<InventoryItem> {
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select("*")
+    .select(
+      `
+      *,
+      categories:category_id (
+        id,
+        name
+      )
+    `,
+    )
     .eq("id", id)
+    .eq("is_deleted", false)
     .single()
 
   if (error) throw error
@@ -36,10 +56,11 @@ export async function getItem(id: string): Promise<InventoryItem> {
   return data as InventoryItem
 }
 
+//  CREATE ITEM (unchanged)
 export async function createInventoryItem(
   item: CreateInventoryItem,
   image: LocalImage,
-): Promise<InventoryItem> {
+) {
   const { publicUrl, path } = await uploadImage(image)
 
   const { data, error } = await supabase
@@ -48,45 +69,46 @@ export async function createInventoryItem(
       ...item,
       image_url: publicUrl,
       image_path: path,
+      category_id: item.category_id ?? null,
     })
     .select()
     .single()
 
   if (error) {
-    // Roll back the uploaded image if the insert fails, so we don't leave
-    // an orphaned file in Storage for an item that was never created.
     await deleteImage(path).catch(() => {})
     throw error
   }
 
-  return data as InventoryItem
+  return data
 }
 
-export async function updateItem(
-  id: string,
-  updates: UpdateInventoryItem,
-): Promise<InventoryItem> {
+// UPDATE ITEM (unchanged logic)
+export async function updateItem(id: string, updates: UpdateInventoryItem) {
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .update(updates)
+    .update({
+      ...updates,
+      category_id: updates.category_id ?? null,
+    })
     .eq("id", id)
     .select()
     .single()
 
   if (error) throw error
 
-  return data as InventoryItem
+  return data
 }
-
+// SOFT DELETE
 export async function deleteInventoryItem(
   item: Pick<InventoryItem, "id" | "image_path">,
 ): Promise<void> {
-  const { error } = await supabase.from(TABLE_NAME).delete().eq("id", item.id)
-  if (error) throw new Error(error.message)
+  const { error } = await supabase
+    .from(TABLE_NAME)
+    .update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq("id", item.id)
 
-  // Delete the image after the row is gone; if this fails it's an orphaned
-  // file, not an orphaned/broken DB row.
-  // await deleteImage(item.image_path).catch(() => {
-  //   console.warn(`Failed to delete image for item ${item.id}`);
-  // });
+  if (error) throw new Error(error.message)
 }

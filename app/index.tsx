@@ -1,10 +1,9 @@
 import { InventoryList } from "@/src/components/inventory/InventoryList"
+import { InventoryListSkeleton } from "@/src/components/inventory/InventoryListSkeleton"
 import ScreenContainer from "@/src/components/layout/ScreenContainer"
 import { AlertDialog } from "@/src/components/ui/AlertDialog"
 import Button from "@/src/components/ui/Button"
 import ErrorState from "@/src/components/ui/ErrorState"
-import FilterChip from "@/src/components/ui/Filterchip"
-import LoadingSpinner from "@/src/components/ui/LoadingSpinner"
 import { useDeleteInventoryItem } from "@/src/hooks/useDeleteInventoryItem"
 import { useInfiniteInventoryList } from "@/src/hooks/useInventoryList"
 import { colors, fonts, radius, spacing } from "@/src/lib/theme"
@@ -18,7 +17,15 @@ import { responsiveHorizontalPadding } from "@/src/utils/responsive"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useState } from "react"
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native"
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native"
 
 const FILTER_OPTIONS: { key: InventoryFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -56,17 +63,14 @@ export default function InventoryListScreen() {
   const [pendingDeleteItem, setPendingDeleteItem] =
     useState<InventoryItem | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false)
+
+  // Temporary state for modal selections
+  const [tempFilter, setTempFilter] = useState<InventoryFilter>("all")
+  const [tempSortBy, setTempSortBy] = useState<InventorySort>("newest")
 
   function handleAdd() {
     router.push("/item/create")
-  }
-
-  function handleCycleSort() {
-    const currentIndex = SORT_OPTIONS.findIndex(
-      (option) => option.key === sortBy,
-    )
-    const next = SORT_OPTIONS[(currentIndex + 1) % SORT_OPTIONS.length]
-    setSortBy(next.key)
   }
 
   function handleDelete(item: InventoryItem) {
@@ -96,14 +100,102 @@ export default function InventoryListScreen() {
     setDeleteError(null)
   }
 
+  function openFilterModal() {
+    setTempFilter(filter)
+    setTempSortBy(sortBy)
+    setIsFilterModalVisible(true)
+  }
+
+  function applyFilters() {
+    setFilter(tempFilter)
+    setSortBy(tempSortBy)
+    setIsFilterModalVisible(false)
+  }
+
+  function resetFilters() {
+    setTempFilter("all")
+    setTempSortBy("newest")
+    setFilter("all")
+    setSortBy("newest")
+    setIsFilterModalVisible(false)
+  }
+
   const items = data?.pages.flat() ?? []
-
   const itemCount = items.length
-
   const currentSortLabel =
     SORT_OPTIONS.find((option) => option.key === sortBy)?.label ?? "Newest"
-
+  const currentFilterLabel =
+    FILTER_OPTIONS.find((option) => option.key === filter)?.label ?? "All"
   const horizontalPadding = responsiveHorizontalPadding()
+
+  const hasActiveFilters = filter !== "all" || sortBy !== "newest"
+
+  // Show skeleton while loading
+  if (isPending) {
+    return (
+      <ScreenContainer>
+        {/* Header */}
+        <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Inventory</Text>
+            <Text style={styles.subtitle}>Loading items...</Text>
+          </View>
+          <View style={styles.addButton}>
+            <Button title="+ Add" onPress={handleAdd} />
+          </View>
+        </View>
+
+        {/* Search + Filter Row (disabled during loading) */}
+        <View
+          style={[
+            styles.searchWrapper,
+            { paddingHorizontal: horizontalPadding },
+          ]}
+        >
+          <View style={styles.searchInputRow}>
+            <Ionicons name="search" size={18} color={colors.textMuted} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search items..."
+              placeholderTextColor={colors.textMuted}
+              style={styles.searchInput}
+              editable={false}
+            />
+          </View>
+          {/* Filter Button - disabled during loading */}
+          <TouchableOpacity style={styles.filterButton} disabled={true}>
+            <Ionicons
+              name="options-outline"
+              size={20}
+              color={colors.textMuted}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Skeleton */}
+        <InventoryListSkeleton count={5} />
+      </ScreenContainer>
+    )
+  }
+
+  if (isError) {
+    return (
+      <ScreenContainer>
+        {/* Header */}
+        <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Inventory</Text>
+            <Text style={styles.subtitle}>Error loading items</Text>
+          </View>
+          <View style={styles.addButton}>
+            <Button title="+ Add" onPress={handleAdd} />
+          </View>
+        </View>
+        <ErrorState message={error.message} onRetry={refetch} />
+      </ScreenContainer>
+    )
+  }
 
   return (
     <ScreenContainer>
@@ -112,9 +204,7 @@ export default function InventoryListScreen() {
         <View style={styles.headerText}>
           <Text style={styles.title}>Inventory</Text>
           <Text style={styles.subtitle}>
-            {isPending
-              ? "Loading items..."
-              : `${itemCount} item${itemCount === 1 ? "" : "s"} in stock`}
+            {`${itemCount} item${itemCount === 1 ? "" : "s"} in stock`}
           </Text>
         </View>
 
@@ -123,7 +213,7 @@ export default function InventoryListScreen() {
         </View>
       </View>
 
-      {/* Search */}
+      {/* Search + Filter Row */}
       <View
         style={[styles.searchWrapper, { paddingHorizontal: horizontalPadding }]}
       >
@@ -136,51 +226,178 @@ export default function InventoryListScreen() {
             placeholderTextColor={colors.textMuted}
             style={styles.searchInput}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={colors.textMuted}
+              />
+            </TouchableOpacity>
+          )}
         </View>
-      </View>
-
-      {/* Filters */}
-      <View style={{ paddingHorizontal: horizontalPadding }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {FILTER_OPTIONS.map((option) => (
-            <FilterChip
-              key={option.key}
-              label={option.label}
-              active={filter === option.key}
-              onPress={() => setFilter(option.key)}
-            />
-          ))}
-
-          <FilterChip
-            label={`Sort: ${currentSortLabel}`}
-            active={false}
-            onPress={handleCycleSort}
+        {/* Filter Button */}
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            hasActiveFilters && styles.filterButtonActive,
+          ]}
+          onPress={openFilterModal}
+        >
+          <Ionicons
+            name="options-outline"
+            size={20}
+            color={hasActiveFilters ? colors.white : colors.textPrimary}
           />
-        </ScrollView>
+          {hasActiveFilters && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>!</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
+
+      {/* Active filters summary */}
+      {hasActiveFilters && (
+        <View
+          style={[
+            styles.activeFilters,
+            { paddingHorizontal: horizontalPadding },
+          ]}
+        >
+          <View style={styles.activeFiltersLeft}>
+            <Ionicons name="filter" size={14} color={colors.primary} />
+            <Text style={styles.activeFiltersText}>
+              {currentFilterLabel} • Sort: {currentSortLabel}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={resetFilters}>
+            <Text style={styles.clearFiltersText}>Clear all</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Content */}
-      {isPending ? (
-        <LoadingSpinner label="Loading inventory..." />
-      ) : isError ? (
-        <ErrorState message={error.message} onRetry={refetch} />
-      ) : (
-        <InventoryList
-          items={items}
-          refreshing={isRefetching}
-          onRefresh={refetch}
-          onDelete={handleDelete}
-          searchQuery={searchQuery}
-          filter={filter}
-          sortBy={sortBy}
-          onEndReached={() => {
-            if (hasNextPage && !isFetchingNextPage) {
-              fetchNextPage()
-            }
-          }}
-          isLoadingMore={isFetchingNextPage}
-        />
-      )}
+      <InventoryList
+        items={items}
+        refreshing={isRefetching}
+        onRefresh={refetch}
+        onDelete={handleDelete}
+        searchQuery={searchQuery}
+        filter={filter}
+        sortBy={sortBy}
+        onEndReached={() => {
+          if (hasNextPage && !isFetchingNextPage) {
+            fetchNextPage()
+          }
+        }}
+        isLoadingMore={isFetchingNextPage}
+      />
+
+      {/* Filter/Sort Modal */}
+      <Modal
+        visible={isFilterModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsFilterModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setIsFilterModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            {/* Drag handle */}
+            <View style={styles.dragHandle} />
+
+            <Text style={styles.modalTitle}>Filter & Sort</Text>
+
+            {/* Filter Section */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>Filter by</Text>
+              <View style={styles.modalOptions}>
+                {FILTER_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.modalOption,
+                      tempFilter === option.key && styles.modalOptionActive,
+                    ]}
+                    onPress={() => setTempFilter(option.key)}
+                  >
+                    <Text
+                      style={[
+                        styles.modalOptionText,
+                        tempFilter === option.key &&
+                          styles.modalOptionTextActive,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    {tempFilter === option.key && (
+                      <Ionicons
+                        name="checkmark"
+                        size={20}
+                        color={colors.primary}
+                      />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Sort Section */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>Sort by</Text>
+              <View style={styles.modalOptions}>
+                {SORT_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.modalOption,
+                      tempSortBy === option.key && styles.modalOptionActive,
+                    ]}
+                    onPress={() => setTempSortBy(option.key)}
+                  >
+                    <Text
+                      style={[
+                        styles.modalOptionText,
+                        tempSortBy === option.key &&
+                          styles.modalOptionTextActive,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    {tempSortBy === option.key && (
+                      <Ionicons
+                        name="checkmark"
+                        size={20}
+                        color={colors.primary}
+                      />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalActionButton, styles.modalResetButton]}
+                onPress={resetFilters}
+              >
+                <Text style={styles.modalResetText}>Reset</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalActionButton, styles.modalApplyButton]}
+                onPress={applyFilters}
+              >
+                <Text style={styles.modalApplyText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
 
       <AlertDialog
         visible={pendingDeleteItem !== null}
@@ -227,12 +444,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addButton: {
-    minWidth: 96,
+    minWidth: 80,
   },
   searchWrapper: {
     marginBottom: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   searchInputRow: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
@@ -249,17 +470,158 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     color: colors.textPrimary,
   },
-  chipsRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    marginBottom: spacing.xs,
+  filterButton: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.sm,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
-  chipDivider: {
-    width: 1,
+  filterButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: colors.danger,
+    borderRadius: 10,
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  filterBadgeText: {
+    fontSize: 8,
+    fontFamily: fonts.bold,
+    color: colors.white,
+  },
+  activeFilters: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: "#EFF6FF",
+    borderRadius: radius.md,
+    marginHorizontal: spacing.lg,
+  },
+  activeFiltersLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  activeFiltersText: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    color: colors.textSecondary,
+  },
+  clearFiltersText: {
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    color: colors.primary,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 34,
+    maxHeight: "80%",
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
     backgroundColor: colors.border,
-    marginHorizontal: spacing.xs,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: fonts.bold,
+    color: colors.textPrimary,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  modalSection: {
+    marginBottom: 24,
+  },
+  modalSectionTitle: {
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  modalOptions: {
+    gap: 8,
+  },
+  modalOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  modalOptionActive: {
+    backgroundColor: "#EFF6FF",
+    borderColor: colors.primary,
+  },
+  modalOptionText: {
+    fontSize: 15,
+    fontFamily: fonts.regular,
+    color: colors.textPrimary,
+  },
+  modalOptionTextActive: {
+    color: colors.primary,
+    fontFamily: fonts.medium,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  modalActionButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    alignItems: "center",
+  },
+  modalResetButton: {
+    backgroundColor: colors.borderLight,
+  },
+  modalResetText: {
+    fontSize: 16,
+    fontFamily: fonts.medium,
+    color: colors.textSecondary,
+  },
+  modalApplyButton: {
+    backgroundColor: colors.primary,
+  },
+  modalApplyText: {
+    fontSize: 16,
+    fontFamily: fonts.medium,
+    color: "#fff",
   },
 })

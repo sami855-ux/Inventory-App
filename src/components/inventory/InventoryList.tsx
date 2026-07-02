@@ -64,7 +64,7 @@ export function InventoryList({
         result = result.filter((item) => item.quantity <= 10)
         break
       case "inStock":
-        result = result.filter((item) => item.quantity > 0)
+        result = result.filter((item) => item.quantity > 10)
         break
     }
 

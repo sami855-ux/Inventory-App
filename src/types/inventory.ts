@@ -6,6 +6,9 @@ export interface InventoryItem {
   price: number
   image_url: string | null
   image_path: string | null
+  category_id: string | null
+  is_deleted: boolean
+  deleted_at: string
   created_at: string
   updated_at: string
 }
@@ -17,6 +20,7 @@ export interface CreateInventoryItem {
   price: number
   image_url?: string | null
   image_path?: string | null
+  category_id: string | null
 }
 
 export interface UpdateInventoryItem {
@@ -26,6 +30,7 @@ export interface UpdateInventoryItem {
   price?: number
   image_url?: string | null
   image_path?: string | null
+  category_id: string | null
 }
 
 export type InventoryFilter = "all" | "lowStock" | "inStock"

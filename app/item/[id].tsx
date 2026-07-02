@@ -1,3 +1,5 @@
+import { uploadImage } from "@/src/api/storage"
+import ImageUploader from "@/src/components/inventory/ImageUploader"
 import { InventoryForm } from "@/src/components/inventory/InventoryForm"
 import ScreenContainer from "@/src/components/layout/ScreenContainer"
 import { AlertDialog } from "@/src/components/ui/AlertDialog"
@@ -8,21 +10,23 @@ import { useDeleteInventoryItem } from "@/src/hooks/useDeleteInventoryItem"
 import { useInventoryItem } from "@/src/hooks/useInventoryItem"
 import { useUpdateInventoryItem } from "@/src/hooks/useUpdateInventoryItem"
 import { colors, fonts, radius, spacing } from "@/src/lib/theme"
-import type { InventoryItemInput } from "@/src/types/inventory"
+import type { InventoryItemInput, LocalImage } from "@/src/types/inventory"
 import { formatCurrency } from "@/src/utils/formatCurrency"
+import { Ionicons } from "@expo/vector-icons"
 import { router, useLocalSearchParams } from "expo-router"
 import { useState } from "react"
 import {
   Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native"
-
-import { uploadImage } from "@/src/api/storage"
-import { Ionicons } from "@expo/vector-icons"
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view"
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -35,6 +39,8 @@ export default function ItemDetailScreen() {
     refetch,
   } = useInventoryItem(id)
 
+  console.log(item)
+
   const {
     mutate: updateItem,
     isPending: isUpdating,
@@ -46,6 +52,7 @@ export default function ItemDetailScreen() {
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [selectedImage, setSelectedImage] = useState<LocalImage | null>(null)
 
   if (isPending) {
     return (
@@ -66,39 +73,34 @@ export default function ItemDetailScreen() {
     )
   }
 
-  async function handleUpdate(
-    input: InventoryItemInput,
-    newImage: string | null,
-  ) {
+  async function handleUpdate(input: InventoryItemInput) {
     try {
       let imageUrl = item?.image_url
       let imagePath = item?.image_path
 
-      // 1. Upload image if new one exists
-      if (newImage) {
-        const uploadResult = await uploadImage(newImage?.uri)
-
+      // Upload new image if selected
+      if (selectedImage) {
+        const uploadResult = await uploadImage(selectedImage.uri)
         imageUrl = uploadResult.publicUrl
         imagePath = uploadResult.path
       }
 
-      console.log(imagePath, imageUrl)
-
-      // 2. Prepare updates
       const updates = {
         ...input,
         image_url: imageUrl,
         image_path: imagePath,
       }
 
-      // 3. Save to DB
       updateItem(
         {
           id: item?.id,
           updates,
         },
         {
-          onSuccess: () => setIsEditing(false),
+          onSuccess: () => {
+            setIsEditing(false)
+            setSelectedImage(null)
+          },
         },
       )
     } catch (error: any) {
@@ -110,7 +112,7 @@ export default function ItemDetailScreen() {
     setDeleteError(null)
 
     deleteItem(
-      { id: item.id, image_path: item.image_path },
+      { id: item?.id, image_path: item?.image_path },
       {
         onSuccess: () => {
           setIsDeleteDialogOpen(false)
@@ -121,92 +123,257 @@ export default function ItemDetailScreen() {
     )
   }
 
-  if (isEditing) {
-    return (
-      <ScreenContainer>
-        <InventoryForm
-          initialValues={{
-            name: item.name,
-            description: item.description,
-            quantity: String(item.quantity),
-            price: String(item.price),
-          }}
-          initialImageUrl={item.image_url}
-          submitLabel="Save Changes"
-          submitting={isUpdating}
-          onSubmit={handleUpdate}
-        />
+  const isLowStock = item.quantity <= 10
+  const hasCategory = !!item.categories?.name
 
-        {updateError ? (
-          <View style={styles.inlineErrorBar}>
-            <Text style={styles.inlineErrorText}>{updateError.message}</Text>
+  // Shared header component
+  const Header = () => (
+    <View style={styles.header}>
+      <TouchableOpacity
+        onPress={() => {
+          if (isEditing) {
+            setIsEditing(false)
+            setSelectedImage(null)
+          } else {
+            router.back()
+          }
+        }}
+        style={styles.backButton}
+      >
+        <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+      </TouchableOpacity>
+
+      <View style={styles.headerCenter}>
+        <Text style={styles.headerTitle}>
+          {isEditing ? "Edit Item" : "Item Details"}
+        </Text>
+        {isEditing && (
+          <View style={styles.editingBadge}>
+            <Text style={styles.editingBadgeText}>Editing</Text>
           </View>
-        ) : null}
-      </ScreenContainer>
-    )
-  }
+        )}
+        {!isEditing && isLowStock && (
+          <View style={styles.lowStockBadge}>
+            <Ionicons name="alert" size={12} color="#DC2626" />
+            <Text style={styles.lowStockBadgeText}>Low Stock</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={{ width: 40 }} />
+    </View>
+  )
 
   return (
     <ScreenContainer>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+
+      {/* HEADER - Always visible */}
+      <Header />
+
+      {isEditing ? (
+        // EDITING MODE - With Keyboard Awareness
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         >
-          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Item Details</Text>
-
-        <View style={{ width: 40 }} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* IMAGE CARD */}
-        <View style={styles.imageCard}>
-          <Image
-            source={{ uri: item.image_url ?? undefined }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        </View>
-
-        {/* NAME + PRICE */}
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.price}>{formatCurrency(item.price)}</Text>
-
-        {/* META CARD */}
-        <View style={styles.card}>
-          <Text style={styles.metaLabel}>Quantity</Text>
-          <Text style={styles.metaValue}>{item.quantity}</Text>
-        </View>
-
-        {/* DESCRIPTION CARD */}
-        <View style={styles.card}>
-          <Text style={styles.descriptionLabel}>Description</Text>
-          <Text style={styles.description}>{item.description}</Text>
-        </View>
-
-        {/* ACTIONS */}
-        <View style={styles.actions}>
-          <View style={styles.actionButton}>
-            <Button
-              title="Edit"
-              onPress={() => setIsEditing(true)}
-              variant="secondary"
+          <KeyboardAwareScrollView
+            style={styles.container}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            keyboardDismissMode="on-drag"
+            enableOnAndroid={true}
+            extraScrollHeight={Platform.OS === "ios" ? 120 : 100}
+            extraHeight={Platform.OS === "ios" ? 120 : 80}
+            enableAutomaticScroll={true}
+            viewIsInsideTabBar={false}
+            automaticallyAdjustContentInsets={false}
+            resetScrollToCoords={{ x: 0, y: 0 }}
+            keyboardOpeningTime={Platform.OS === "ios" ? 0 : 0}
+          >
+            <ImageUploader
+              image={selectedImage?.uri ?? item.image_url}
+              onChange={setSelectedImage}
+              title="Item Image"
+              disabled={isUpdating}
             />
+
+            <InventoryForm
+              initialValues={{
+                name: item.name,
+                description: item?.description || "",
+                quantity: String(item.quantity),
+                price: String(item.price),
+              }}
+              submitLabel="Save Changes"
+              submitting={isUpdating}
+              onSubmit={handleUpdate}
+            />
+
+            {/* Cancel button when editing */}
+            <TouchableOpacity
+              style={styles.cancelEditButton}
+              onPress={() => {
+                setIsEditing(false)
+                setSelectedImage(null)
+              }}
+              disabled={isUpdating}
+            >
+              <Text style={styles.cancelEditText}>Cancel Editing</Text>
+            </TouchableOpacity>
+
+            {updateError && (
+              <View style={styles.inlineErrorBar}>
+                <Text style={styles.inlineErrorText}>
+                  {updateError.message}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.bottomSpacer} />
+          </KeyboardAwareScrollView>
+        </KeyboardAvoidingView>
+      ) : (
+        // VIEW MODE - Modern Design
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* IMAGE CARD */}
+          <View style={styles.imageCard}>
+            <Image
+              source={{ uri: item.image_url ?? undefined }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+            {isLowStock && (
+              <View style={styles.imageLowStockOverlay}>
+                <Ionicons name="alert-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.imageLowStockText}>Low Stock</Text>
+              </View>
+            )}
           </View>
 
-          <View style={styles.actionButton}>
-            <Button
-              title="Delete"
-              onPress={() => setIsDeleteDialogOpen(true)}
-              variant="danger"
-            />
+          {/* NAME & PRICE ROW */}
+          <View style={styles.namePriceRow}>
+            <View style={styles.nameContainer}>
+              <Text style={styles.name}>{item.name}</Text>
+              {isLowStock && (
+                <View style={styles.lowStockIndicator}>
+                  <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                  <Text style={styles.lowStockIndicatorText}>Low Stock</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.price}>{formatCurrency(item.price)}</Text>
           </View>
-        </View>
-      </ScrollView>
+
+          {/* CATEGORY CARD */}
+          <View style={styles.infoCard}>
+            <View style={styles.infoCardHeader}>
+              <Ionicons
+                name="pricetag-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <Text style={styles.infoCardLabel}>Category</Text>
+            </View>
+            {hasCategory ? (
+              <View style={styles.categoryContainer}>
+                <View style={styles.categoryBadge}>
+                  <Ionicons
+                    name="folder-outline"
+                    size={14}
+                    color="#1D4ED8"
+                    style={styles.categoryIcon}
+                  />
+                  <Text style={styles.categoryText}>
+                    {item?.categories?.name}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.noCategoryText}>No category assigned</Text>
+            )}
+          </View>
+
+          {/* QUANTITY CARD */}
+          <View style={styles.infoCard}>
+            <View style={styles.infoCardHeader}>
+              <Ionicons
+                name="cube-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <Text style={styles.infoCardLabel}>Quantity</Text>
+            </View>
+            <View style={styles.quantityRow}>
+              <Text style={styles.infoCardValue}>{item.quantity}</Text>
+              {isLowStock && (
+                <View style={styles.lowStockPill}>
+                  <Text style={styles.lowStockPillText}>Low Stock</Text>
+                </View>
+              )}
+            </View>
+            {isLowStock && (
+              <Text style={styles.lowStockWarning}>
+                ⚠️ This item has {item.quantity} units remaining. Consider
+                restocking soon.
+              </Text>
+            )}
+          </View>
+
+          {/* DESCRIPTION CARD */}
+          <View style={styles.infoCard}>
+            <View style={styles.infoCardHeader}>
+              <Ionicons
+                name="document-text-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <Text style={styles.infoCardLabel}>Description</Text>
+            </View>
+            <Text style={styles.description}>
+              {item.description || "No description provided"}
+            </Text>
+          </View>
+
+          {/* ACTIONS */}
+          <View style={styles.actions}>
+            <View style={styles.actionButton}>
+              <Button
+                title="Edit Item"
+                onPress={() => setIsEditing(true)}
+                variant="secondary"
+                icon={
+                  <Ionicons
+                    name="pencil-outline"
+                    size={18}
+                    color={colors.primary}
+                  />
+                }
+              />
+            </View>
+
+            <View style={styles.actionButton}>
+              <Button
+                title="Delete"
+                onPress={() => setIsDeleteDialogOpen(true)}
+                variant="danger"
+                icon={
+                  <Ionicons
+                    name="trash-outline"
+                    size={18}
+                    color={colors.white}
+                  />
+                }
+              />
+            </View>
+          </View>
+        </ScrollView>
+      )}
 
       {/* DELETE DIALOG */}
       <AlertDialog
@@ -231,17 +398,23 @@ export default function ItemDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  /* HEADER */
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xxl + spacing.lg,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: Platform.OS === "ios" ? spacing.md : spacing.md,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderColor: colors.borderLight,
     backgroundColor: colors.surface,
-    gap: 5,
+    minHeight: Platform.OS === "ios" ? 60 : 70,
   },
   backButton: {
     width: 40,
@@ -250,46 +423,122 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
   headerTitle: {
     fontSize: 16,
     fontFamily: fonts.bold,
     color: colors.textPrimary,
   },
-
-  /* CONTENT */
+  editingBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  editingBadgeText: {
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    color: "#FFFFFF",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  lowStockBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#FEE2E2",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  lowStockBadgeText: {
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    color: "#DC2626",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   content: {
     padding: spacing.lg,
     paddingBottom: spacing.xxl + spacing.lg,
   },
-
-  /* IMAGE */
+  editContent: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl + spacing.lg,
+  },
+  // Image Card
   imageCard: {
     borderRadius: radius.lg,
     overflow: "hidden",
     backgroundColor: colors.borderLight,
     marginBottom: spacing.lg,
+    position: "relative",
   },
   image: {
     width: "100%",
-    height: 240,
+    height: 260,
   },
-
-  /* TEXT */
+  imageLowStockOverlay: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(220, 38, 38, 0.9)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  imageLowStockText: {
+    fontSize: 12,
+    fontFamily: fonts.bold,
+    color: "#FFFFFF",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  // Name & Price
+  namePriceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  nameContainer: {
+    flex: 1,
+    gap: 4,
+  },
   name: {
     fontSize: 24,
     fontFamily: fonts.bold,
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
+  },
+  lowStockIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  lowStockIndicatorText: {
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    color: "#DC2626",
   },
   price: {
-    fontSize: 18,
+    fontSize: 22,
     fontFamily: fonts.bold,
     color: colors.primary,
-    marginBottom: spacing.lg,
   },
-
-  /* CARD STYLE SECTIONS */
-  card: {
+  // Info Cards
+  infoCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.lg,
@@ -297,30 +546,87 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
-
-  metaLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
+  infoCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: spacing.sm,
   },
-  metaValue: {
-    fontSize: 16,
+  infoCardLabel: {
+    fontSize: 13,
     fontFamily: fonts.medium,
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  infoCardValue: {
+    fontSize: 18,
+    fontFamily: fonts.bold,
     color: colors.textPrimary,
   },
-
-  descriptionLabel: {
-    fontSize: 13,
+  // Category Styles
+  categoryContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  categoryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    alignSelf: "flex-start",
+    gap: 6,
+  },
+  categoryIcon: {
+    marginRight: 2,
+  },
+  categoryText: {
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: "#1D4ED8",
+  },
+  noCategoryText: {
+    fontSize: 14,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    fontStyle: "italic",
+  },
+  quantityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  lowStockPill: {
+    backgroundColor: "#FEE2E2",
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  lowStockPillText: {
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    color: "#DC2626",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  lowStockWarning: {
+    marginTop: 8,
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    color: "#DC2626",
+    lineHeight: 18,
   },
   description: {
     fontSize: 15,
     color: colors.textPrimary,
-    lineHeight: 22,
+    lineHeight: 24,
+    fontFamily: fonts.regular,
   },
-
-  /* ACTIONS */
+  // Actions
   actions: {
     flexDirection: "row",
     gap: spacing.md,
@@ -329,8 +635,6 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
   },
-
-  /* ERROR */
   inlineErrorBar: {
     position: "absolute",
     bottom: spacing.lg,
@@ -345,5 +649,18 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 13,
     textAlign: "center",
+  },
+  bottomSpacer: {
+    height: 100,
+  },
+  cancelEditButton: {
+    paddingVertical: spacing.md,
+    alignItems: "center",
+    marginTop: spacing.sm,
+  },
+  cancelEditText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 15,
   },
 })
