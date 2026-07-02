@@ -1,10 +1,12 @@
 import {
   CreateInventoryItem,
   InventoryItem,
+  LocalImage,
   UpdateInventoryItem,
 } from "@/src/types/inventory"
 
 import { PAGE_SIZE, TABLE_NAME } from "./constants"
+import { deleteImage, uploadImage } from "./storage"
 import { supabase } from "./supabaseClient"
 
 export async function getItems(page: number = 0): Promise<InventoryItem[]> {
@@ -34,16 +36,28 @@ export async function getItem(id: string): Promise<InventoryItem> {
   return data as InventoryItem
 }
 
-export async function createItem(
+export async function createInventoryItem(
   item: CreateInventoryItem,
+  image: LocalImage,
 ): Promise<InventoryItem> {
+  const { publicUrl, path } = await uploadImage(image)
+
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .insert(item)
+    .insert({
+      ...item,
+      image_url: publicUrl,
+      image_path: path,
+    })
     .select()
     .single()
 
-  if (error) throw error
+  if (error) {
+    // Roll back the uploaded image if the insert fails, so we don't leave
+    // an orphaned file in Storage for an item that was never created.
+    await deleteImage(path).catch(() => {})
+    throw error
+  }
 
   return data as InventoryItem
 }

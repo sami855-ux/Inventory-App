@@ -1,18 +1,21 @@
+import { createInventoryItem } from "@/src/api/inventory"
+import { QUERY_KEYS } from "@/src/lib/constants"
+import type { InventoryItemInput, LocalImage } from "@/src/types/inventory"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-
-import { createItem } from "@/src/api/inventory"
-import { CreateInventoryItem } from "@/src/types/inventory"
 
 export function useCreateInventoryItem() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (item: CreateInventoryItem) => createItem(item),
-
+    mutationFn: ({
+      input,
+      image,
+    }: {
+      input: InventoryItemInput
+      image: LocalImage
+    }) => createInventoryItem(input, image),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["inventory"],
-      })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.inventoryList })
     },
   })
 }
