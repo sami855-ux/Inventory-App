@@ -30,6 +30,7 @@ export default function CreateItemScreen() {
   } | null>(null)
 
   function handleSubmit(input: InventoryItemInput) {
+    console.log(image, input)
     if (!image) {
       setErrorDialog({
         title: "Image required",

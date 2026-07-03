@@ -1,4 +1,4 @@
-import { Ionicons, MaterialIcons } from "@expo/vector-icons"
+import { Ionicons } from "@expo/vector-icons"
 import * as ImagePicker from "expo-image-picker"
 import React, { useState } from "react"
 import {
@@ -28,6 +28,7 @@ export default function ImageUploader({
   disabled = false,
 }: ImageUploaderProps) {
   const [visible, setVisible] = useState(false)
+  console.log(image)
 
   async function pickFromGallery() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -148,24 +149,6 @@ export default function ImageUploader({
               />
               <Text style={styles.buttonText}>Choose from Gallery</Text>
             </TouchableOpacity>
-
-            {image && (
-              <TouchableOpacity
-                style={[styles.button, styles.removeButton]}
-                onPress={() => {
-                  onChange(null)
-                  setVisible(false)
-                }}
-              >
-                <MaterialIcons
-                  name="delete-outline"
-                  size={20}
-                  color="#DC2626"
-                  style={styles.buttonIcon}
-                />
-                <Text style={styles.removeText}>Remove Image</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </Pressable>
       </Modal>

@@ -36,7 +36,7 @@ export function InventoryCard({ item, onPress, onDelete }: InventoryCardProps) {
         />
       ) : (
         <View style={styles.noImage}>
-          <Text style={styles.noImageText}>No Image</Text>
+          <Ionicons name="image-outline" size={32} color={colors.textMuted} />
         </View>
       )}
 

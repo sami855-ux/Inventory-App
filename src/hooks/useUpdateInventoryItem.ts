@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { updateItem } from "@/src/api/inventory"
-import { UpdateInventoryItem } from "@/src/types/inventory"
+import { LocalImage, UpdateInventoryItem } from "@/src/types/inventory"
 
 export function useUpdateInventoryItem() {
   const queryClient = useQueryClient()
@@ -10,10 +10,20 @@ export function useUpdateInventoryItem() {
     mutationFn: ({
       id,
       updates,
+      newImage,
+      currentImagePath,
     }: {
       id: string
       updates: UpdateInventoryItem
-    }) => updateItem(id, updates),
+      newImage?: LocalImage
+      currentImagePath: string
+    }) =>
+      updateItem({
+        id,
+        updates,
+        newImage,
+        currentImagePath,
+      }),
 
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
@@ -24,8 +34,9 @@ export function useUpdateInventoryItem() {
         queryKey: ["inventory", variables.id],
       })
     },
+
     onError: (err) => {
-      console.log(err)
+      console.log("Update inventory error:", err)
     },
   })
 }

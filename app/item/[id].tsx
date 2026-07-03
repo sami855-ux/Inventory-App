@@ -78,7 +78,7 @@ export default function ItemDetailScreen() {
 
       // Upload new image if selected
       if (selectedImage) {
-        const uploadResult = await uploadImage(selectedImage.uri)
+        const uploadResult = await uploadImage(selectedImage)
         imageUrl = uploadResult.publicUrl
         imagePath = uploadResult.path
       }
@@ -242,11 +242,21 @@ export default function ItemDetailScreen() {
         >
           {/* IMAGE CARD */}
           <View style={styles.imageCard}>
-            <Image
-              source={{ uri: item.image_url ?? undefined }}
-              style={styles.image}
-              resizeMode="cover"
-            />
+            {item.image_url ? (
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.image}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.noImage}>
+                <Ionicons
+                  name="image-outline"
+                  size={32}
+                  color={colors.textMuted}
+                />
+              </View>
+            )}
             {isLowStock && (
               <View style={styles.imageLowStockOverlay}>
                 <Ionicons name="alert-circle" size={20} color="#FFFFFF" />
@@ -410,8 +420,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: Platform.OS === "ios" ? spacing.md : spacing.md,
     paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderColor: colors.borderLight,
     backgroundColor: colors.surface,
     minHeight: Platform.OS === "ios" ? 60 : 70,
   },
@@ -482,6 +490,13 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: 260,
+  },
+  noImage: {
+    width: "100%",
+    height: 260,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.borderLight,
   },
   imageLowStockOverlay: {
     position: "absolute",

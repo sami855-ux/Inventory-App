@@ -43,12 +43,11 @@ export type InventoryFilter = "all" | "lowStock" | "inStock"
 export type InventorySort = "name" | "price" | "quantity" | "newest"
 
 export type InventoryItemInput = {
-  id: string
   name: string
   description: string
   quantity: number
   price: number
-  category: string
+  category_id: string
 }
 
 export interface LocalImage {

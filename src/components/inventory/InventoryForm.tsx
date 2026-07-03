@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { ScrollView, StyleSheet, Text, View } from "react-native"
-import Animated, { FadeInDown } from "react-native-reanimated"
 
 import Button from "@/src/components/ui/Button"
 import Input from "@/src/components/ui/Input"
@@ -63,7 +62,7 @@ export function InventoryForm({
     onSubmit({
       name: data.name.trim(),
       description: data.description.trim(),
-      category: data.category?.trim() || "",
+      category_id: data.category,
       quantity: Number(data.quantity),
       price: Number(data.price),
     })
@@ -75,10 +74,7 @@ export function InventoryForm({
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <Animated.View
-        entering={FadeInDown.delay(100).springify()}
-        style={styles.section}
-      >
+      <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionLabel}>Basic Information</Text>
         </View>
@@ -134,12 +130,7 @@ export function InventoryForm({
                       const isActive = String(value) === String(category.id)
 
                       return (
-                        <Animated.View
-                          key={category.id}
-                          entering={FadeInDown.delay(
-                            150 + index * 50,
-                          ).springify()}
-                        >
+                        <View key={category.id}>
                           <Button
                             title={category.name}
                             onPress={() => {
@@ -152,7 +143,7 @@ export function InventoryForm({
                                 : styles.categoryButton
                             }
                           />
-                        </Animated.View>
+                        </View>
                       )
                     })}
                   </View>
@@ -167,12 +158,9 @@ export function InventoryForm({
             )}
           />
         </View>
-      </Animated.View>
+      </View>
 
-      <Animated.View
-        entering={FadeInDown.delay(200).springify()}
-        style={styles.section}
-      >
+      <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionLabel}>Pricing & Stock</Text>
         </View>
@@ -214,19 +202,16 @@ export function InventoryForm({
             </View>
           </View>
         </View>
-      </Animated.View>
+      </View>
 
-      <Animated.View
-        entering={FadeInDown.delay(300).springify()}
-        style={styles.submitWrapper}
-      >
+      <View style={styles.submitWrapper}>
         <Button
           title={submitLabel}
           onPress={handleSubmit(submitHandler)}
           loading={submitting}
           style={styles.submitButton}
         />
-      </Animated.View>
+      </View>
     </ScrollView>
   )
 }
