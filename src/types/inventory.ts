@@ -12,6 +12,12 @@ export interface InventoryItem {
   created_at: string
   updated_at: string
 }
+export interface Category {
+  id: string
+  name: string
+  description: string | null
+  created_at: string
+}
 
 export interface CreateInventoryItem {
   name: string
@@ -42,6 +48,7 @@ export type InventoryItemInput = {
   description: string
   quantity: number
   price: number
+  category: string
 }
 
 export interface LocalImage {

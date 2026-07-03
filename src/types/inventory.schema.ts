@@ -11,6 +11,7 @@ export const inventorySchema = z.object({
     .string()
     .min(1, "Price is required")
     .refine((val) => !isNaN(Number(val)), "Must be a number"),
+  category: z.string(),
 })
 
 export type InventoryFormSchema = z.infer<typeof inventorySchema>

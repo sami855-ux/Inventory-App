@@ -1,4 +1,5 @@
 import {
+  Category,
   CreateInventoryItem,
   InventoryItem,
   LocalImage,
@@ -45,6 +46,18 @@ export async function getItem(id: string): Promise<InventoryItem> {
         id,
         name
       )
+        export async function getCategories(): Promise<Category[]> {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("*")
+    .order("name", { ascending: true })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return data
+}
     `,
     )
     .eq("id", id)
@@ -111,4 +124,17 @@ export async function deleteInventoryItem(
     .eq("id", item.id)
 
   if (error) throw new Error(error.message)
+}
+
+export async function getCategories(): Promise<Category[]> {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("*")
+    .order("name", { ascending: true })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return data
 }

@@ -39,8 +39,6 @@ export default function ItemDetailScreen() {
     refetch,
   } = useInventoryItem(id)
 
-  console.log(item)
-
   const {
     mutate: updateItem,
     isPending: isUpdating,
@@ -206,6 +204,7 @@ export default function ItemDetailScreen() {
                 description: item?.description || "",
                 quantity: String(item.quantity),
                 price: String(item.price),
+                category: String(item.categories?.id),
               }}
               submitLabel="Save Changes"
               submitting={isUpdating}

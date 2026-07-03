@@ -166,13 +166,6 @@ export default function ImageUploader({
                 <Text style={styles.removeText}>Remove Image</Text>
               </TouchableOpacity>
             )}
-
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={() => setVisible(false)}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
           </View>
         </Pressable>
       </Modal>
