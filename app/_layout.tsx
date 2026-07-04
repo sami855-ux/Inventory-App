@@ -8,13 +8,14 @@ import { useEffect } from "react"
 
 import "../global.css"
 
-SplashScreen.preventAutoHideAsync()
+// Prevent splash from auto-hiding (safe version)
+SplashScreen.preventAutoHideAsync().catch(() => {})
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     "Inter-Regular": require("@/assets/fonts/Inter_18pt-Regular.ttf"),
-    "Inter-Medium": require("../assets/fonts/Inter_18pt-Medium.ttf"),
-    "Inter-Bold": require("../assets/fonts/Inter_18pt-Bold.ttf"),
+    "Inter-Medium": require("@/assets/fonts/Inter_18pt-Medium.ttf"),
+    "Inter-Bold": require("@/assets/fonts/Inter_18pt-Bold.ttf"),
   })
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export default function RootLayout() {
     }
   }, [fontsLoaded])
 
+  // Keep splash visible until fonts are ready
   if (!fontsLoaded) {
     return null
   }
@@ -30,6 +32,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar style="dark" />
+
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: "#FFFFFF" },
@@ -39,8 +42,12 @@ export default function RootLayout() {
       >
         <Stack.Screen
           name="index"
-          options={{ title: "Inventory", headerShown: false }}
+          options={{
+            title: "Inventory",
+            headerShown: false,
+          }}
         />
+
         <Stack.Screen
           name="item/create/index"
           options={{
@@ -49,9 +56,13 @@ export default function RootLayout() {
             headerShown: false,
           }}
         />
+
         <Stack.Screen
           name="item/[id]"
-          options={{ title: "Item Details", headerShown: false }}
+          options={{
+            title: "Item Details",
+            headerShown: false,
+          }}
         />
       </Stack>
     </QueryClientProvider>
