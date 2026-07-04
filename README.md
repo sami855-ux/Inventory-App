@@ -139,12 +139,6 @@ The app will fail to load (blank splash screen) if these are missing, since `_la
 
 ### 4. Environment Variables
 
-Copy `.env.example` to `.env`:
-
-```bash
-cp .env.example .env
-```
-
 Fill in your Supabase project values (found in **Project Settings → API**):
 
 ```
