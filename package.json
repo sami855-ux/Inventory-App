@@ -18,7 +18,7 @@
     "@react-navigation/native": "^7.1.8",
     "@supabase/supabase-js": "^2.109.0",
     "@tanstack/react-query": "^5.101.2",
-    "babel-preset-expo": "^57.0.1",
+    "babel-preset-expo": "~54.0.10",
     "expo": "~54.0.34",
     "expo-constants": "~18.0.13",
     "expo-file-system": "~19.0.23",
